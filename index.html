@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<!-- Mobile-first, zoom-locked (game feel). -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>SKYLINE STACK — One-Tap 3D Tower Stacker · Play Free</title>
+<meta name="description" content="SKYLINE STACK — a one-tap 3D tower stacker. Drop sliding blocks, slice the overhang, chain PERFECT drops to grow the tower back and turn the skyline white-hot. Endless height. Play free in your browser." />
+
+<!-- Open Graph / social link preview -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="SKYLINE STACK" />
+<meta property="og:title" content="SKYLINE STACK — one-tap 3D tower stacker" />
+<meta property="og:description" content="Drop sliding blocks, slice the overhang, chain PERFECT drops to turn the skyline white-hot. Endless height. Play free." />
+<meta property="og:url" content="https://quangle1997.github.io/skyline-stack/" />
+<meta property="og:image" content="https://quangle1997.github.io/skyline-stack/assets/og-card.jpg" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="675" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="SKYLINE STACK — one-tap 3D tower stacker" />
+<meta name="twitter:description" content="Drop sliding blocks, slice the overhang, chain PERFECT drops to turn the skyline white-hot. Endless height." />
+<meta name="twitter:image" content="https://quangle1997.github.io/skyline-stack/assets/og-card.jpg" />
+
+<!-- Favicon emoji -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🏙️</text></svg>" />
+
+<!-- Fonts: Orbitron (display) + Space Grotesk (body) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+
+<!-- Three.js — zero-build via importmap CDN (jsDelivr, r0.169) -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+}}
+</script>
+
+<style>
+/* ---------- TOKENS ---------- */
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#06060d; --ink:#eef0ff; --mut:#9aa0c0; --line:rgba(255,255,255,.10);
+  --disp:'Orbitron',system-ui,sans-serif; --body:'Space Grotesk',system-ui,-apple-system,sans-serif;
+  --accent:#ff6b3d;          /* SKYLINE STACK — coral */
+}
+html,body{height:100%;}
+body{ background:var(--bg); color:var(--ink); font-family:var(--body); line-height:1.45;
+  -webkit-font-smoothing:antialiased; display:grid; place-items:center; overflow:hidden;
+  user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+/* drifting gradient-mesh shown in the desktop letterbox around the phone frame */
+body::before{ content:""; position:fixed; inset:-30%; z-index:-2; pointer-events:none;
+  background:
+    radial-gradient(40% 40% at 18% 22%, color-mix(in srgb,var(--accent) 20%,transparent), transparent 60%),
+    radial-gradient(38% 38% at 82% 18%, rgba(127,140,255,.14), transparent 60%),
+    radial-gradient(45% 45% at 76% 84%, rgba(255,90,138,.13), transparent 60%),
+    radial-gradient(42% 42% at 22% 82%, rgba(120,90,200,.13), transparent 60%);
+  filter:blur(20px); animation:mesh 26s ease-in-out infinite alternate; }
+@keyframes mesh{ from{transform:translate3d(-3%,-2%,0) scale(1)} to{transform:translate3d(3%,3%,0) scale(1.08)} }
+@media (prefers-reduced-motion:reduce){ *{animation:none!important;} }
+
+/* ---------- MOBILE-FRAME (strategy A): portrait frame centered, letterbox on desktop ---------- */
+#app{ position:relative; width:min(100vw,480px); height:100dvh; max-height:100dvh;
+  overflow:hidden; background:linear-gradient(180deg,#120a1e,#0a0712 60%,#150a14);
+  box-shadow:0 0 0 1px var(--line), 0 30px 90px -20px color-mix(in srgb,var(--accent) 45%,transparent); }
+canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+
+/* heat overlay — screen-color shift that intensifies with a perfect streak */
+#heat{ position:absolute; inset:0; pointer-events:none; z-index:2; opacity:0; transition:opacity .35s ease;
+  background:radial-gradient(135% 78% at 50% 28%, color-mix(in srgb,var(--accent) 72%,transparent), transparent 60%),
+            radial-gradient(120% 62% at 50% 110%, color-mix(in srgb,#ff3d6e 52%,transparent), transparent 72%);
+  mix-blend-mode:screen; }
+/* one-frame white flash on perfect */
+#flash{ position:absolute; inset:0; pointer-events:none; z-index:3; background:#fff; opacity:0; }
+
+/* floating popups (combo / PERFECT) */
+#pops{ position:absolute; inset:0; pointer-events:none; z-index:4; }
+.pop{ position:absolute; left:50%; top:30%; transform:translate(-50%,0); font-family:var(--disp); font-weight:900;
+  text-transform:uppercase; letter-spacing:.08em; white-space:nowrap; animation:pop 1s ease-out forwards; }
+.pop.perfect{ color:#fff; font-size:26px; text-shadow:0 0 18px color-mix(in srgb,var(--accent) 90%,transparent),0 2px 10px rgba(0,0,0,.5); }
+.pop.combo{ color:var(--accent); font-size:18px; text-shadow:0 2px 10px rgba(0,0,0,.5); }
+@keyframes pop{ 0%{opacity:0;transform:translate(-50%,6px) scale(.7)} 18%{opacity:1;transform:translate(-50%,-6px) scale(1.08)}
+  100%{opacity:0;transform:translate(-50%,-54px) scale(1)} }
+
+/* ---------- HUD ---------- */
+#hud{ position:absolute; inset:0; pointer-events:none; z-index:5; padding:env(safe-area-inset-top) 12px 0; transition:opacity .2s; }
+#app.overlay-open #hud{ opacity:0; pointer-events:none; }
+.chip{ border:1px solid var(--line); background:linear-gradient(180deg,rgba(22,20,38,.66),rgba(12,10,22,.78));
+  backdrop-filter:blur(14px); border-radius:14px; padding:8px 12px; font-family:var(--disp); font-weight:800; }
+#top{ position:absolute; top:calc(env(safe-area-inset-top) + 10px); left:10px; right:10px;
+  display:flex; gap:8px; align-items:flex-start; justify-content:space-between; }
+#score{ font-size:26px; line-height:1; letter-spacing:.02em; min-width:54px; text-align:center; }
+#score small{ display:block; font-family:var(--body); font-weight:600; font-size:9px; color:var(--mut); letter-spacing:.22em; margin-top:3px; }
+#score b{ color:var(--accent); }
+.icons{ display:flex; gap:8px; pointer-events:auto; }
+.icons button{ all:unset; box-sizing:border-box; cursor:pointer; width:40px; height:40px; display:grid; place-items:center;
+  border:1px solid var(--line); border-radius:12px; background:rgba(20,18,34,.7); backdrop-filter:blur(14px); font-size:18px; }
+/* streak chip — center top, lights up on a hot streak */
+#streak{ position:absolute; top:calc(env(safe-area-inset-top) + 14px); left:50%; transform:translateX(-50%);
+  font-family:var(--disp); font-weight:800; font-size:13px; letter-spacing:.1em; padding:6px 12px; border-radius:999px;
+  color:#1a0e08; background:linear-gradient(180deg,#ffd24a,var(--accent)); opacity:0; transition:opacity .2s, transform .2s;
+  box-shadow:0 6px 22px -6px color-mix(in srgb,var(--accent) 80%,transparent); white-space:nowrap; }
+#streak.on{ opacity:1; }
+#streak.bump{ transform:translateX(-50%) scale(1.16); }
+
+/* ---------- OVERLAYS ---------- */
+.overlay{ position:absolute; inset:0; display:grid; place-items:center; padding:22px; z-index:10;
+  background:radial-gradient(120% 120% at 50% 0%, rgba(10,7,18,.5), rgba(6,5,12,.92)); }
+.overlay.hidden{ display:none; } .overlay.hidden, .overlay.hidden *{ pointer-events:none; }
+.panel{ width:100%; max-width:360px; text-align:center; border:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(24,20,40,.86),rgba(12,10,22,.93)); backdrop-filter:blur(14px);
+  border-radius:22px; padding:26px 22px; box-shadow:0 24px 60px -18px color-mix(in srgb,var(--accent) 50%,transparent); }
+h1{ font-family:var(--disp); font-weight:900; text-transform:uppercase; letter-spacing:.03em;
+  font-size:clamp(32px,9vw,46px); line-height:.96; margin-bottom:6px;
+  background:linear-gradient(95deg,#ffd24a,var(--accent),#c77dff,#7f8cff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.kick{ font-family:var(--disp); font-weight:700; text-transform:uppercase; letter-spacing:.3em; font-size:11px; color:var(--mut); margin-bottom:18px; }
+.btn{ all:unset; box-sizing:border-box; cursor:pointer; display:block; width:100%; margin:10px 0; padding:15px; text-align:center;
+  font-family:var(--disp); font-weight:800; text-transform:uppercase; letter-spacing:.12em; font-size:15px; border-radius:14px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 88%,#fff 0%),color-mix(in srgb,var(--accent) 70%,#000 18%));
+  color:#1a0e08; box-shadow:0 10px 26px -10px color-mix(in srgb,var(--accent) 70%,transparent); }
+.btn.ghost{ background:rgba(255,255,255,.05); color:var(--ink); border:1px solid var(--line); box-shadow:none; }
+.pills{ display:flex; gap:8px; justify-content:center; margin:14px 0 6px; }
+.pill{ all:unset; box-sizing:border-box; flex:1; text-align:center; padding:11px 6px; border-radius:12px; border:1px solid var(--line);
+  background:rgba(255,255,255,.04); font-family:var(--disp); font-weight:700; font-size:12px; text-transform:uppercase;
+  letter-spacing:.06em; cursor:pointer; color:var(--mut); }
+.pill.on{ color:#1a0e08; background:var(--accent); border-color:transparent; }
+.pill small{ display:block; font-family:var(--body); font-weight:600; font-size:9px; letter-spacing:.04em; opacity:.8; margin-top:2px; }
+.stat{ display:flex; justify-content:space-between; align-items:center; padding:9px 2px; border-bottom:1px solid var(--line); font-size:14px; }
+.stat:last-of-type{ border-bottom:0; }
+.stat b{ font-family:var(--disp); color:var(--accent); font-size:16px; }
+.how{ text-align:left; color:var(--mut); font-size:14px; line-height:1.65; margin:6px 0 4px; }
+.how p{ margin:7px 0; } .how b{ color:var(--ink); }
+.toggle{ display:flex; align-items:center; justify-content:space-between; padding:11px 2px; font-size:14px; }
+.sw{ width:46px; height:26px; border-radius:20px; background:rgba(255,255,255,.12); position:relative; cursor:pointer; transition:.15s; flex:none; }
+.sw.on{ background:var(--accent); } .sw::after{ content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:.15s; }
+.sw.on::after{ left:23px; }
+.hero{ font-family:var(--disp); font-weight:900; font-size:clamp(54px,20vw,86px); line-height:1; color:var(--accent);
+  text-shadow:0 0 40px color-mix(in srgb,var(--accent) 60%,transparent); margin:2px 0 0; }
+.hero small{ display:block; font-family:var(--body); font-weight:600; font-size:12px; letter-spacing:.24em; color:var(--mut); text-transform:uppercase; }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv"></canvas>
+  <div id="heat"></div>
+  <div id="flash"></div>
+  <div id="pops"></div>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="top">
+      <div class="chip" id="score">0<small>HEIGHT</small></div>
+      <div class="icons">
+        <button id="muteBtn" aria-label="Mute">🔊</button>
+        <button id="pauseBtn" aria-label="Pause">⏸</button>
+      </div>
+    </div>
+    <div id="streak">🔥 PERFECT ×2</div>
+  </div>
+
+  <!-- MENU -->
+  <div class="overlay" id="menu">
+    <div class="panel">
+      <h1>SKYLINE<br>STACK</h1>
+      <div class="kick">One-tap tower · part of QUANG ARCADE</div>
+      <div class="pills" id="modePills">
+        <button class="pill" data-mode="chill">Chill<small>relaxed</small></button>
+        <button class="pill on" data-mode="classic">Classic<small>balanced</small></button>
+        <button class="pill" data-mode="rush">Rush<small>fast</small></button>
+      </div>
+      <button class="btn" id="playBtn">▶ Play</button>
+      <button class="btn ghost" id="howBtn">How to play</button>
+      <div class="stat"><span>Best height</span><b id="bestVal">0</b></div>
+      <div class="stat"><span>Longest perfect streak</span><b id="bestStreakVal">0</b></div>
+    </div>
+  </div>
+
+  <!-- HOW TO PLAY -->
+  <div class="overlay hidden" id="how">
+    <div class="panel">
+      <h1 style="font-size:30px">How to play</h1>
+      <div class="how">
+        <p>🏙️ A block slides above the tower. <b>Tap anywhere</b> (or Space) to drop it.</p>
+        <p>✂️ Any part hanging over the edge is <b>sliced off</b> — the rest becomes your new top.</p>
+        <p>🎯 Drop near-perfectly for a <b>PERFECT</b>: no trim, the block grows back, the pitch rises &amp; the skyline turns hotter.</p>
+        <p>⚡ It speeds up as you climb. Miss the tower &amp; it's over. <b>Higher = better.</b></p>
+      </div>
+      <button class="btn" id="howOk">Got it</button>
+    </div>
+  </div>
+
+  <!-- PAUSE -->
+  <div class="overlay hidden" id="pause">
+    <div class="panel">
+      <h1 style="font-size:34px">Paused</h1>
+      <div class="kick">Take a breath</div>
+      <div class="toggle"><span>Music</span><div class="sw on" id="swMusic"></div></div>
+      <div class="toggle"><span>Sound FX</span><div class="sw on" id="swSfx"></div></div>
+      <div class="toggle"><span>Haptics</span><div class="sw on" id="swHaptic"></div></div>
+      <button class="btn" id="resumeBtn">Resume</button>
+      <button class="btn ghost" id="quitBtn">Quit to menu</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="overlay hidden" id="gameover">
+    <div class="panel">
+      <div class="kick">Tower toppled</div>
+      <div class="hero" id="finalScore">0<small>blocks high</small></div>
+      <div class="stat" style="margin-top:14px"><span>Best height</span><b id="goBest">0</b></div>
+      <div class="stat"><span>Perfect drops</span><b id="goPerfect">0</b></div>
+      <div class="stat"><span>Longest streak</span><b id="goStreak">0</b></div>
+      <button class="btn" id="retryBtn" style="margin-top:14px">▶ Play again</button>
+      <button class="btn ghost" id="menuBtn">Menu</button>
+    </div>
+  </div>
+
+  <!-- FATAL (CDN / WebGL failure guard) -->
+  <div class="overlay hidden" id="fatal">
+    <div class="panel">
+      <h1 style="font-size:28px">Couldn't start</h1>
+      <p class="how" style="text-align:center">The 3D engine failed to load.<br>Check your connection and reload.</p>
+      <button class="btn" onclick="location.reload()">Reload</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+/* ============================================================
+   SKYLINE STACK — one-tap 3D tower stacker (Three.js, zero-build).
+   Shell systems (save / settings / audio / scenes / HUD) live up top;
+   the 3D engine + game logic boot inside a CDN-fail guard below.
+   All balance numbers live in CONFIG (single source of truth — DOCS §14).
+   ============================================================ */
+
+const NS = 'skyline-stack';
+const $ = s => document.querySelector(s);
+let gestured = false;   // set on first real user gesture — vibrate() is blocked before then
+
+/* ---------- CONFIG (single source of truth — see DOCS.md §14) ---------- */
+const CONFIG = {
+  BLOCK_H:   0.62,    // block thickness (world units, Y)
+  BASE_W:    3.2,     // starting footprint (square, world units)
+  AMP:       3.05,    // slide half-range around centre (~BASE_W → a worst-time tap can still miss a full block, stays in frame)
+  PERFECT:   0.18,    // |delta| ≤ this (world units) = PERFECT drop
+  GROWBACK:  0.18,    // footprint restored toward BASE_W per perfect
+  MIN_SLIVER:0.30,    // overlap below this (world units) = tower toppled (miss / sliver too small)
+  WOBBLE_AT: 0.95,    // overlap below this (and not perfect) triggers a near-fall wobble
+  STREAK_MAX:8,       // perfect streak at which heat / pitch ladder maxes out
+  // start-speed modes (block slide speed = base + height*perLevel, capped at max) — world units/sec
+  MODES: {
+    chill:   { base:2.6, perLevel:0.045, max:7.0,  label:'Chill'   },
+    classic: { base:3.4, perLevel:0.065, max:9.0,  label:'Classic' },
+    rush:    { base:4.8, perLevel:0.090, max:12.5, label:'Rush'    },
+  },
+  COLOR: { hueStart:200, hueStep:4.2, perfectHue:14 }, // cyan→magenta base gradient walk → coral on hot streaks
+  CAM:   { dist:21, fov:30, dirX:1, dirY:0.86, dirZ:1, lookAhead:-1.9, follow:6.5 },
+  VISIBLE_DEPTH: 16,  // blocks kept below the top before culling+disposing
+  GRAVITY: 26,        // debris fall accel
+};
+
+/* ---------- SaveManager (localStorage) ---------- */
+const Save = {
+  get(k, d){ try{ const v = localStorage[`${NS}.${k}`]; return v==null?d:JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage[`${NS}.${k}`] = JSON.stringify(v); }catch{} },
+};
+
+/* ---------- Settings ---------- */
+const Settings = {
+  music:  Save.get('music', true),
+  sfx:    Save.get('sfx', true),
+  haptic: Save.get('haptic', true),
+  save(){ Save.set('music',this.music); Save.set('sfx',this.sfx); Save.set('haptic',this.haptic); },
+};
+
+/* ---------- AudioManager (WebAudio synth — no external files) ---------- */
+const Audio = {
+  ctx:null, muted: Save.get('muted', false),
+  ensure(){ if(!this.ctx) this.ctx = new (window.AudioContext||window.webkitAudioContext)();
+            if(this.ctx.state==='suspended') this.ctx.resume(); return this.ctx; },   // iOS/Android: must run in a gesture
+  note(f=440,d=.1,type='sine',g=.18,when=0){ if(this.muted||!Settings.sfx) return; const a=this.ensure();
+    const o=a.createOscillator(), gn=a.createGain(); o.type=type; o.frequency.value=f;
+    const t=a.currentTime+when; gn.gain.setValueAtTime(g,t); gn.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(gn).connect(a.destination); o.start(t); o.stop(t+d); },
+  // rising pitch ladder for perfect drops — steps up one note per streak, resets on miss
+  ladder:[523.25,587.33,659.25,783.99,880,1046.5,1174.66,1318.51],
+  perfect(streak){ if(this.muted||!Settings.sfx) return; const i=Math.min(streak-1,this.ladder.length-1);
+    const f=this.ladder[i]; this.note(f,.18,'sine',.20); this.note(f*1.5,.13,'triangle',.07); },
+  drop(){ this.note(300,.05,'triangle',.13); this.note(150,.12,'sine',.12); },     // soft "tok"
+  slice(){ this.note(440,.07,'sawtooth',.07); this.note(220,.05,'square',.05); },  // chip flying off
+  over(){ if(this.muted||!Settings.sfx) return; [330,247,196,147,110].forEach((f,i)=>this.note(f,.34,'sawtooth',.24,i*.07)); },
+};
+/* gentle synthwave bed — lookahead scheduler, tempo rises slightly with height */
+const Music = {
+  on:false, step:0, next:0, timer:null,
+  start(){ if(this.on||!Settings.music||Audio.muted) return; const a=Audio.ensure(); this.on=true; this.step=0; this.next=a.currentTime+.12; this.tick(); },
+  stop(){ this.on=false; clearTimeout(this.timer); },
+  refresh(){ if(Settings.music && !Audio.muted && S.mode==='playing') this.start(); else this.stop(); },
+  tick(){ if(!this.on){ return; } const a=Audio.ctx; const bpm=84+Math.min(S.height*0.9,46); const spb=60/bpm/2; // eighth notes
+    while(this.next < a.currentTime+0.18){ this.play(this.next); this.next+=spb; this.step++; }
+    this.timer=setTimeout(()=>this.tick(),60); },
+  play(t){ if(Audio.muted||!Settings.music) return; const a=Audio.ctx; const root=55; // A1
+    const arp=[0,7,12,16,19,16,12,7], pad=[0,7,15];
+    const voice=(f,d,g,type)=>{ const o=a.createOscillator(),gn=a.createGain(); o.type=type; o.frequency.value=f;
+      gn.gain.setValueAtTime(0,t); gn.gain.linearRampToValueAtTime(g,t+.02); gn.gain.exponentialRampToValueAtTime(.0001,t+d);
+      o.connect(gn).connect(a.destination); o.start(t); o.stop(t+d); };
+    if(this.step%2===0){ const s=arp[(this.step/2|0)%arp.length]; voice(root*4*Math.pow(2,s/12),.22,.045,'triangle'); }
+    if(this.step%8===0){ voice(root,.7,.05,'sine'); pad.forEach(s=>voice(root*2*Math.pow(2,s/12),1.1,.018,'sawtooth')); }
+  },
+};
+function haptic(ms){ if(gestured && Settings.haptic && navigator.vibrate) try{ navigator.vibrate(ms); }catch{} }
+
+/* ---------- SceneManager (UI overlays) ---------- */
+const Scenes = ['menu','how','pause','gameover','fatal'];
+function show(id){ Scenes.forEach(s=>$('#'+s).classList.toggle('hidden', s!==id));
+  $('#app').classList.toggle('overlay-open', id!==null && id!==undefined); }
+function hideAll(){ Scenes.forEach(s=>$('#'+s).classList.add('hidden')); $('#app').classList.remove('overlay-open'); }
+
+/* ---------- State ---------- */
+const S = {
+  mode:'menu', modeKey:'classic', spd:CONFIG.MODES.classic,
+  height:0, perfects:0, streak:0,
+  best:Save.get('best',0), bestStreak:Save.get('bestStreak',0),
+  // engine / world filled in by boot()
+  tower:[], debris:[], move:null, axis:'x', dir:1,
+  shake:0, wobble:0, wobbleSign:1, engineReady:false,
+};
+
+/* ---------- HUD ---------- */
+function updateHUD(){ $('#score').firstChild.textContent = S.height; }
+function showStreak(){ const el=$('#streak');
+  if(S.streak>=2){ el.textContent=`🔥 PERFECT ×${S.streak}`; el.classList.add('on','bump'); setTimeout(()=>el.classList.remove('bump'),200); }
+  else el.classList.remove('on'); }
+function floatPop(text, kind){ const p=document.createElement('div'); p.className='pop '+kind; p.textContent=text;
+  $('#pops').appendChild(p); setTimeout(()=>p.remove(),1000); }
+function flash(a){ const f=$('#flash'); f.style.transition='none'; f.style.opacity=a; requestAnimationFrame(()=>{ f.style.transition='opacity .26s ease'; f.style.opacity=0; }); }
+function setHeat(){ const h=Math.min(S.streak/CONFIG.STREAK_MAX,1); $('#heat').style.opacity=(h*0.62).toFixed(3); }
+
+/* ============================================================
+   3D ENGINE + GAME LOGIC — boots inside CDN-fail guard
+   ============================================================ */
+let THREE, renderer, scene, camera, composer, boxGeo, sharedEnv, lowFX=false;
+const MOBILE = matchMedia('(pointer:coarse)').matches || innerWidth < 540;
+
+async function boot(){
+  THREE = await import('three');
+  const { EffectComposer } = await import('three/addons/postprocessing/EffectComposer.js');
+  const { RenderPass }     = await import('three/addons/postprocessing/RenderPass.js');
+  const { UnrealBloomPass }= await import('three/addons/postprocessing/UnrealBloomPass.js');
+  const { OutputPass }     = await import('three/addons/postprocessing/OutputPass.js');
+  const { RoomEnvironment }= await import('three/addons/environments/RoomEnvironment.js');
+
+  const cv = $('#cv');
+  renderer = new THREE.WebGLRenderer({ canvas:cv, antialias:!MOBILE, powerPreference:'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio||1, 2));   // cap DPR ≤2 (perf on mobile)
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+
+  scene = new THREE.Scene();
+  scene.background = skyTexture();
+  scene.environmentIntensity = 0.4;   // tone down IBL so block colours stay saturated (not washed)
+  scene.fog = new THREE.Fog(0x140a16, 22, 52);
+
+  // soft premium lighting + env reflections
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  sharedEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = sharedEnv;
+  scene.add(new THREE.HemisphereLight(0xbfd0ff, 0x301826, 0.55));
+  const key = new THREE.DirectionalLight(0xfff0e6, 1.15); key.position.set(8,16,10); scene.add(key);
+  const rim = new THREE.DirectionalLight(0xff8a5a, 0.5); rim.position.set(-9,6,-6); scene.add(rim);
+
+  camera = new THREE.PerspectiveCamera(CONFIG.CAM.fov, 1, 0.1, 200);
+
+  // post: subtle bloom (weak strength + high threshold per house style)
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1,1), 0.45, 0.4, 0.84);
+  composer.addPass(bloom); composer.addPass(new OutputPass());
+  boot.bloom = bloom;
+
+  boxGeo = new THREE.BoxGeometry(1, 1, 1);   // shared unit cube — every block is mesh.scale of this
+  S.engineReady = true;
+  resize();
+  buildBase();
+  requestAnimationFrame(loop);
+}
+
+/* vertical synthwave sky as scene background */
+function skyTexture(){
+  const c=document.createElement('canvas'); c.width=8; c.height=256; const g=c.getContext('2d');
+  const grd=g.createLinearGradient(0,0,0,256);
+  grd.addColorStop(0,'#241a3e'); grd.addColorStop(0.45,'#1a1030'); grd.addColorStop(0.78,'#12091d'); grd.addColorStop(1,'#2a1326');
+  g.fillStyle=grd; g.fillRect(0,0,8,256);
+  const t=new (THREE).CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+
+/* ---------- colour for a block at a given height + streak heat ---------- */
+function blockColor(height, streak){
+  const heat=Math.min(streak/CONFIG.STREAK_MAX,1);
+  let hue=(CONFIG.COLOR.hueStart + height*CONFIG.COLOR.hueStep) % 360;
+  // blend toward coral as the streak grows (shortest-path hue lerp)
+  let dh=((CONFIG.COLOR.perfectHue-hue+540)%360)-180; hue=(hue+dh*heat*0.82+360)%360;
+  const sat=0.62+heat*0.33, lig=0.55-heat*0.05;   // hot = vivid & saturated (not washed white)
+  const col=new THREE.Color().setHSL(hue/360, sat, lig);
+  return { col, heat };
+}
+
+/* ---------- world helpers ---------- */
+const cy = lvl => (lvl+0.5)*CONFIG.BLOCK_H;             // world Y of a block centre at level index
+function makeMesh(sx,sz,colorObj,emissive){
+  const mat=new THREE.MeshStandardMaterial({ color:colorObj.col, roughness:0.52, metalness:0.05,
+    emissive:colorObj.col.clone(), emissiveIntensity:emissive });
+  const m=new THREE.Mesh(boxGeo, mat); m.scale.set(sx,CONFIG.BLOCK_H,sz); return m;
+}
+function buildBase(){
+  // reset world
+  for(const b of S.tower) if(b.mesh){ scene.remove(b.mesh); b.mesh.material.dispose(); }
+  for(const d of S.debris){ scene.remove(d.mesh); d.mesh.material.dispose(); }
+  S.tower=[]; S.debris=[]; S.move=null;
+  const c=blockColor(0,0); const m=makeMesh(CONFIG.BASE_W,CONFIG.BASE_W,c,0.0);
+  m.position.set(0,cy(0),0); scene.add(m);
+  S.tower.push({ mesh:m, x:0, z:0, sx:CONFIG.BASE_W, sz:CONFIG.BASE_W });
+  camera.position.set(CONFIG.CAM.dirX,CONFIG.CAM.dirY,CONFIG.CAM.dirZ).normalize().multiplyScalar(CONFIG.CAM.dist);
+  camTargetY=cy(0); camera.lookAt(0,camTargetY,0);
+}
+
+/* ---------- spawn the next sliding block ---------- */
+function spawnMoving(){
+  const lvl=S.tower.length, below=S.tower[lvl-1];
+  S.axis=(lvl%2===1)?'x':'z'; S.dir=1;
+  const c=blockColor(lvl,S.streak);
+  const m=makeMesh(below.sx,below.sz,c, c.heat*0.2);
+  const start=-CONFIG.AMP;
+  const x=(S.axis==='x')?start:below.x, z=(S.axis==='z')?start:below.z;
+  m.position.set(x,cy(lvl),z); scene.add(m);
+  S.move={ mesh:m, x, z, sx:below.sx, sz:below.sz, lvl };
+}
+
+/* ---------- the drop (tap) ---------- */
+function drop(forceDelta){
+  if(S.mode!=='playing' || !S.move) return;
+  const mv=S.move, lvl=mv.lvl, below=S.tower[lvl-1], axis=S.axis;
+  const size=(axis==='x')?below.sx:below.sz;
+  const bc=(axis==='x')?below.x:below.z;
+  const mc=(forceDelta!=null)? bc+forceDelta : mv[axis];
+  const delta=mc-bc, ad=Math.abs(delta), overlap=size-ad;
+
+  if(overlap < CONFIG.MIN_SLIVER){ topple(mv); return; }   // miss / sliver too small → game over
+
+  const perfect = ad <= CONFIG.PERFECT;
+  let newSize, newCenter;
+  if(perfect){
+    newSize=Math.min(size+CONFIG.GROWBACK, CONFIG.BASE_W); newCenter=bc;
+    S.streak++; S.perfects++;
+    Audio.perfect(S.streak); haptic([8,26,8]);
+    floatPop(S.streak>=2?`PERFECT ×${S.streak}`:'PERFECT','perfect'); flash(0.4); S.shake=Math.min(0.5,0.18+S.streak*0.02);
+  } else {
+    newSize=overlap; newCenter=bc+delta/2;
+    spawnDebris(axis, below, mv, delta, ad, newCenter, newSize);
+    S.streak=0; Audio.drop(); Audio.slice(); haptic(12); S.shake=0.12;
+    if(overlap < CONFIG.WOBBLE_AT){ S.wobble=0.5; S.wobbleSign=Math.sign(delta)||1; }
+  }
+
+  // convert the moving mesh into the placed block (reuse it)
+  const nx=(axis==='x')?newCenter:below.x, nz=(axis==='z')?newCenter:below.z;
+  const nsx=(axis==='x')?newSize:below.sx, nsz=(axis==='z')?newSize:below.sz;
+  mv.mesh.scale.set(nsx,CONFIG.BLOCK_H,nsz); mv.mesh.position.set(nx,cy(lvl),nz);
+  const c=blockColor(lvl,S.streak);
+  mv.mesh.material.color.copy(c.col); mv.mesh.material.emissive.copy(c.col); mv.mesh.material.emissiveIntensity=perfect?(0.06+c.heat*0.22):0.0;
+  S.tower.push({ mesh:mv.mesh, x:nx, z:nz, sx:nsx, sz:nsz });
+  S.move=null; S.height=lvl;
+
+  if(S.height>S.best){ S.best=S.height; Save.set('best',S.best); }
+  if(S.streak>S.bestStreak){ S.bestStreak=S.streak; Save.set('bestStreak',S.bestStreak); }
+  setHeat(); showStreak(); updateHUD();
+  cullBelow();
+  spawnMoving();
+}
+
+/* ---------- sliced-off debris ---------- */
+function spawnDebris(axis, below, mv, delta, ad, keptCenter, keptSize){
+  const sign=Math.sign(delta)||1;
+  const dc=keptCenter + sign*(keptSize/2 + ad/2);   // sits just outside the kept block on the overhang side
+  const sx=(axis==='x')?ad:mv.sx, sz=(axis==='z')?ad:mv.sz;
+  const x=(axis==='x')?dc:mv.x, z=(axis==='z')?dc:mv.z;
+  const c=mv.mesh.material.color;
+  const mat=new THREE.MeshStandardMaterial({ color:c.clone(), roughness:0.5, metalness:0.1, transparent:true, opacity:1 });
+  const m=new THREE.Mesh(boxGeo,mat); m.scale.set(sx,CONFIG.BLOCK_H,sz); m.position.set(x,cy(mv.lvl),z); scene.add(m);
+  S.debris.push({ mesh:m, vx:(axis==='x')?sign*3.2:0, vy:1.2, vz:(axis==='z')?sign*3.2:0,
+    rx:(Math.random()-0.5)*5, rz:(Math.random()-0.5)*5, life:2.4 });
+}
+
+/* ---------- game over ---------- */
+function topple(mv){
+  // the missed block tumbles away
+  const c=mv.mesh.material; c.transparent=true;
+  S.debris.push({ mesh:mv.mesh, vx:(S.axis==='x')?Math.sign(mv.x||1)*2:0.6, vy:1.0, vz:(S.axis==='z')?Math.sign(mv.z||1)*2:0.6,
+    rx:(Math.random()-0.5)*4, rz:(Math.random()-0.5)*4, life:3 });
+  S.move=null; S.mode='gameover'; Music.stop();
+  Audio.over(); haptic([40,60,40]); S.shake=0.6;
+  if(S.height>S.best){ S.best=S.height; Save.set('best',S.best); }
+  if(S.bestStreak>Save.get('bestStreak',0)) Save.set('bestStreak',S.bestStreak);
+  Save.set('plays',(Save.get('plays',0)+1));
+  $('#finalScore').firstChild.textContent=S.height;
+  $('#goBest').textContent=S.best; $('#goPerfect').textContent=S.perfects; $('#goStreak').textContent=S.bestStreak;
+  setTimeout(()=>{ show('gameover'); }, 620);   // let the block fall a beat first
+}
+
+/* ---------- cull + dispose blocks far below the view ---------- */
+function cullBelow(){
+  const cut=S.tower.length-1-CONFIG.VISIBLE_DEPTH;
+  for(let i=0;i<=cut;i++){ const b=S.tower[i]; if(b && b.mesh){ scene.remove(b.mesh); b.mesh.material.dispose(); b.mesh=null; } }
+}
+
+/* ---------- per-frame update ---------- */
+let camTargetY=0;
+function update(dt){
+  // slide the active block (constant-speed ping-pong)
+  if(S.mode==='playing' && S.move){
+    const spd=Math.min(S.spd.base + S.height*S.spd.perLevel, S.spd.max);
+    let p=S.move[S.axis] + S.dir*spd*dt;
+    if(p> CONFIG.AMP){ p=CONFIG.AMP; S.dir=-1; } else if(p< -CONFIG.AMP){ p=-CONFIG.AMP; S.dir=1; }
+    S.move[S.axis]=p; S.move.mesh.position[S.axis]=p;
+  }
+  // debris physics
+  for(let i=S.debris.length-1;i>=0;i--){ const d=S.debris[i]; d.vy-=CONFIG.GRAVITY*dt;
+    d.mesh.position.x+=d.vx*dt; d.mesh.position.y+=d.vy*dt; d.mesh.position.z+=d.vz*dt;
+    d.mesh.rotation.x+=d.rx*dt; d.mesh.rotation.z+=d.rz*dt; d.life-=dt;
+    if(d.life<1.0){ d.mesh.material.opacity=Math.max(0,d.life/1.0); }
+    if(d.life<=0 || d.mesh.position.y < camTargetY-30){ scene.remove(d.mesh); d.mesh.material.dispose(); S.debris.splice(i,1); }
+  }
+  // near-fall wobble on the freshly placed top
+  if(S.wobble>0 && S.tower.length){ S.wobble=Math.max(0,S.wobble-dt*1.6);
+    const top=S.tower[S.tower.length-1]; if(top.mesh) top.mesh.rotation[S.axis==='x'?'z':'x']=Math.sin(S.wobble*22)*S.wobble*0.06*S.wobbleSign; }
+  else if(S.tower.length){ const top=S.tower[S.tower.length-1]; if(top.mesh){ top.mesh.rotation.x*=0.8; top.mesh.rotation.z*=0.8; } }
+  // camera follows the top (smooth)
+  const topY=cy(S.tower.length-1);
+  camTargetY += (topY+CONFIG.CAM.lookAhead - camTargetY)*Math.min(1,dt*CONFIG.CAM.follow);
+  const d=CONFIG.CAM, base=new THREE.Vector3(d.dirX,d.dirY,d.dirZ).normalize().multiplyScalar(d.dist);
+  let sx=0,sy=0; if(S.shake>0){ S.shake=Math.max(0,S.shake-dt*2.2); sx=(Math.random()-0.5)*S.shake*0.5; sy=(Math.random()-0.5)*S.shake*0.5; }
+  camera.position.set(base.x+sx, base.y+camTargetY+sy, base.z); camera.lookAt(0,camTargetY,0);
+}
+
+function render(){ if(lowFX) renderer.render(scene,camera); else composer.render(); }
+
+let last=0;
+function loop(now){ const dt=Math.min((now-(last||now))/1000, 0.05); last=now;
+  if(S.engineReady){ update(dt); render(); }
+  fpsWatch(now);
+  requestAnimationFrame(loop); }
+
+/* auto quality drop if frame-rate sags */
+let _frames=0,_t0=0;
+function fpsWatch(now){ if(!_t0)_t0=now; _frames++; if(now-_t0>=1000){ if(_frames<45 && !lowFX){ lowFX=true; } _frames=0; _t0=now; } }
+
+function resize(){ if(!S.engineReady) return; const r=$('#app').getBoundingClientRect();
+  renderer.setSize(r.width,r.height,false); composer.setSize(r.width,r.height);
+  camera.aspect=r.width/r.height; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize);
+
+/* ---------- flow ---------- */
+function startGame(){ if(!S.engineReady){ show('fatal'); return; }
+  Audio.ensure();
+  S.spd=CONFIG.MODES[S.modeKey];
+  Object.assign(S,{ mode:'playing', height:0, perfects:0, streak:0, shake:0, wobble:0 });
+  buildBase(); setHeat(); showStreak(); updateHUD(); hideAll();
+  spawnMoving(); Music.start(); }
+function pauseGame(){ if(S.mode!=='playing') return; S.mode='paused'; Music.stop(); show('pause'); }
+function resumeGame(){ if(S.mode!=='paused') return; S.mode='playing'; hideAll(); last=performance.now(); Music.refresh(); }
+function toMenu(){ S.mode='menu'; Music.stop(); $('#bestVal').textContent=S.best; $('#bestStreakVal').textContent=S.bestStreak;
+  $('#streak').classList.remove('on'); $('#heat').style.opacity=0; show('menu'); }
+
+/* ---------- input ---------- */
+addEventListener('pointerdown', ()=>{ gestured=true; }, true);
+addEventListener('keydown', ()=>{ gestured=true; }, true);
+function tap(){ if(S.mode==='playing'){ Audio.ensure(); drop(); } }
+$('#cv').addEventListener('pointerdown', e=>{ e.preventDefault(); tap(); });
+addEventListener('keydown', e=>{
+  if(e.code==='Space'){ e.preventDefault(); if(S.mode==='playing') tap(); else if(S.mode==='gameover') startGame(); }
+  else if(e.key==='Escape'||e.key==='p'){ if(S.mode==='playing') pauseGame(); else if(S.mode==='paused') resumeGame(); }
+});
+
+/* ---------- wire UI ---------- */
+$('#modePills').addEventListener('click', e=>{ const p=e.target.closest('.pill'); if(!p) return;
+  S.modeKey=p.dataset.mode; [...$('#modePills').children].forEach(c=>c.classList.toggle('on',c===p));
+  Audio.ensure(); Audio.note(720,.05,'triangle',.12); });
+$('#playBtn').onclick   = ()=>{ Audio.ensure(); if(!Save.get('onboarded',false)){ Save.set('onboarded',true); show('how'); } else startGame(); };
+$('#howBtn').onclick    = ()=> show('how');
+$('#howOk').onclick     = ()=> startGame();
+$('#pauseBtn').onclick  = ()=> S.mode==='playing'?pauseGame():resumeGame();
+$('#resumeBtn').onclick = resumeGame;
+$('#quitBtn').onclick   = toMenu;
+$('#retryBtn').onclick  = startGame;
+$('#menuBtn').onclick   = toMenu;
+$('#muteBtn').onclick   = ()=>{ Audio.muted=!Audio.muted; Save.set('muted',Audio.muted);
+  $('#muteBtn').textContent=Audio.muted?'🔇':'🔊'; Audio.ensure(); Music.refresh(); };
+
+function bindSwitch(el,key){ const sw=$(el); const sync=()=>sw.classList.toggle('on',Settings[key]);
+  sync(); sw.onclick=()=>{ Settings[key]=!Settings[key]; Settings.save(); sync(); if(key==='music') Music.refresh(); }; }
+bindSwitch('#swMusic','music'); bindSwitch('#swSfx','sfx'); bindSwitch('#swHaptic','haptic');
+
+/* ---------- boot ---------- */
+$('#muteBtn').textContent=Audio.muted?'🔇':'🔊'; toMenu();
+boot().catch(err=>{ console.error('engine boot failed', err); S.engineReady=false; show('fatal'); });
+addEventListener('error', e=>console.error('runtime', e.error||e.message));
+addEventListener('unhandledrejection', e=>console.error('promise', e.reason));
+
+/* ============================================================
+   DEV / TEST HELPERS — inert unless called. Used by the ?shot= hook
+   to drive states for screenshot evidence. Harmless in production.
+   ============================================================ */
+window._S=S;
+window._build=function(n, opts={}){            // stack n blocks instantly (with optional trailing perfect streak)
+  if(!S.engineReady) return;
+  S.spd=CONFIG.MODES[S.modeKey]; Object.assign(S,{mode:'playing',height:0,perfects:0,streak:0,shake:0,wobble:0});
+  buildBase(); updateHUD(); hideAll(); spawnMoving();
+  const tail=opts.streak||0;
+  for(let i=0;i<n;i++){
+    const below=S.tower[S.tower.length-1], size=Math.min(below.sx,below.sz);
+    let delta;
+    if(i>=n-tail || size<1.5) delta=0;                              // forced-perfect tail / grow back when thin (never collapse a demo build)
+    else if(Math.random()<0.4) delta=0;                            // ~40% perfect → natural streaks (warm bands)
+    else delta=(0.22+Math.random()*0.22)*(Math.random()<0.5?-1:1); // visible trim (> PERFECT) → breaks streak (cool bands)
+    drop(delta);
+    if(S.mode!=='playing') break;
+  }
+  setHeat(); showStreak(); updateHUD();
+};
+window._streak=function(n){ S.streak=n; if(n>S.bestStreak) S.bestStreak=n; setHeat(); showStreak();
+  if(n>=2) floatPop(`PERFECT ×${n}`,'perfect'); };
+window._over=function(){ if(S.move) drop(99); };   // force a miss → game over
+
+/* ?shot=scene[:arg] — drive a state for headless screenshots */
+(function(){ const shot=new URLSearchParams(location.search).get('shot'); if(!shot) return;
+  const [scene,arg]=shot.split(':'); const n=parseInt(arg||'0',10)||0;
+  const go=()=>{ switch(scene){
+    case 'menu':  toMenu(); break;
+    case 'how':   show('how'); break;
+    case 'play':  _build(n||4); break;                         // low tower, block mid-slide
+    case 'tall':  _build(n||40); break;                        // tall tower, colour gradient
+    case 'perfect': _build(n||26,{streak:6}); break;           // hot streak: heat overlay + popup + hot colours
+    case 'pause': _build(n||10); pauseGame(); break;
+    case 'over':  _build(n||14); _over(); setTimeout(()=>show('gameover'),60); break;
+  } };
+  // wait for engine
+  const wait=()=>{ if(S.engineReady) setTimeout(go,260); else setTimeout(wait,80); }; wait();
+})();
+</script>
+</body>
+</html>

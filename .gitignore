@@ -1,0 +1,6 @@
+# raw full-res screenshots (only downsized JPGs in tests/screenshots/ are committed)
+tests/_raw/
+# OS / editor noise
+Thumbs.db
+.DS_Store
+*.log
