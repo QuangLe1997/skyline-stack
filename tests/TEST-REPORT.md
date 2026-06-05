@@ -25,7 +25,8 @@
 | T13 | Logic | PERFECT streak heat on mobile (streak chip + hot hues) | mobile | [13-perfect-m.jpg](screenshots/13-perfect-m.jpg) | ✅ PASS | |
 | T14 | Responsive | Game over on mobile | mobile | [14-gameover-m.jpg](screenshots/14-gameover-m.jpg) | ✅ PASS | panel fits, no overflow |
 | T15 | Logic | **Real end-to-end playthrough via UI** (no dev shortcuts) | mobile | [15-realplay-m.jpg](screenshots/15-realplay-m.jpg) | ✅ PASS | see below |
-| T16 | Juice | **Death-cam** — on game over the camera pulls back to reveal the whole tower the player built | desktop | [16-reveal-d.jpg](screenshots/16-reveal-d.jpg) | ✅ PASS | full base→top framing (height 40), mid pull-back, tap-to-skip |
+| T16 | Juice | **Death-cam overview** — on game over the camera pulls back to frame the whole tower | desktop | [16-reveal-d.jpg](screenshots/16-reveal-d.jpg) | ✅ PASS | full base→top framing (height 40), held overview |
+| T17 | Juice | **Death-cam scan** — then a slow vertical scan top→base (regret beat; longer for taller towers, tap-to-skip) | desktop | [17-scan-d.jpg](screenshots/17-scan-d.jpg) | ✅ PASS | close pan partway down a height-40 tower |
 
 ### T15 — real interaction trace (clicks on the actual UI, taps on the canvas)
 ```
@@ -54,4 +55,4 @@ The screenshot caught a live `PERFECT` popup + a falling slice debris mid-animat
 ## DOCS.md ↔ code
 - `DOCS.md` matches the shipped code: §6.1 modes (Chill 2.6 / Classic 3.4 / Rush 4.8), §7 scoring (height = score; perfect = grow-back + streak), §14 `CONFIG` constants all verified against `index.html`. ✅
 
-## ✅ VERDICT: **PASS — GAME DONE** (16/16 test cases PASS, 16 screenshots desktop+mobile, 0 console errors)
+## ✅ VERDICT: **PASS — GAME DONE** (17/17 test cases PASS, 17 screenshots desktop+mobile, 0 console errors)

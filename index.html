@@ -259,6 +259,8 @@ const CONFIG = {
   COLOR: { hueStart:200, hueStep:4.2, perfectHue:14 }, // cyan→magenta base gradient walk → coral on hot streaks
   CAM:   { dist:21, fov:30, dirX:1, dirY:0.86, dirZ:1, lookAhead:-1.9, follow:6.5, revealMargin:1.42, revealSpin:0.14 },
   KEEP_MAX: 240,      // keep the whole tower for the death reveal (off-screen blocks are frustum-culled); dispose only beyond this
+  // death cinematic timings (seconds; hold + scan scale with tower height → taller tower = longer goodbye)
+  DEATHCAM: { pull:0.95, holdBase:0.55, holdPerH:0.014, holdMax:0.9, moveIn:0.65, scanPerH:0.055, scanMin:1.3, scanMax:4.8, scanDistFrac:0.46 },
   GRAVITY: 26,        // debris fall accel
 };
 
@@ -526,20 +528,43 @@ function topple(mv){
   Save.set('plays',(Save.get('plays',0)+1));
   $('#finalScore').firstChild.textContent=S.height;
   $('#goBest').textContent=S.best; $('#goPerfect').textContent=S.perfects; $('#goStreak').textContent=S.bestStreak;
-  revealTower();                                 // pull the camera back to show the whole tower...
-  revealTimer=setTimeout(()=>{ show('gameover'); }, 1500);   // ...then bring up the panel (tap to skip)
+  revealTower();   // pull back → hold overview → slow scan top→bottom, then raise the panel (scheduled inside; tap to skip)
 }
 
-/* pull the camera back to frame the entire tower the player built (the "behold your work" beat) */
+/* death cinematic: pull back to frame the whole tower, hold, then slowly scan top→bottom.
+   Taller tower = longer hold + scan (more time to feel the loss). */
 function revealTower(){
   $('#heat').style.opacity=0;
   const topLvl=S.tower.length-1; let botLvl=0; while(botLvl<topLvl && !S.tower[botLvl].mesh) botLvl++;
-  const topY=cy(topLvl)+CONFIG.BLOCK_H/2, botY=cy(botLvl)-CONFIG.BLOCK_H/2;
-  S.revealMidY=(topY+botY)/2;
-  const H=Math.max(topY-botY, CONFIG.BASE_W*1.6), fov=CONFIG.CAM.fov*Math.PI/180;
-  S.revealDist=Math.max(CONFIG.CAM.dist, (H*CONFIG.CAM.revealMargin*0.5)/Math.tan(fov*0.5)/0.82);  // fit the full height in view
-  if(scene.fog){ scene.fog.near=S.revealDist*1.5; scene.fog.far=S.revealDist*3.2; }                // don't fog out the pulled-back tower
-  S.revealSpin=0; S.revealActive=true;
+  const fov=CONFIG.CAM.fov*Math.PI/180;
+  S.revTopY=cy(topLvl)+CONFIG.BLOCK_H/2; S.revBotY=cy(botLvl)-CONFIG.BLOCK_H/2;
+  S.revealMidY=(S.revTopY+S.revBotY)/2; S.revHeight=topLvl-botLvl;
+  const H=Math.max(S.revTopY-S.revBotY, CONFIG.BASE_W*1.6);
+  S.overviewDist=Math.max(CONFIG.CAM.dist, (H*CONFIG.CAM.revealMargin*0.5)/Math.tan(fov*0.5)/0.82); // fit full height
+  const dc=CONFIG.DEATHCAM;
+  S.scanDist=Math.max(16, Math.min(S.overviewDist*dc.scanDistFrac, 34));                             // closer, intimate scan
+  S.tPull=dc.pull; S.tHold=dc.holdBase+Math.min(S.revHeight*dc.holdPerH,dc.holdMax); S.tIn=dc.moveIn;
+  S.tScan=Math.max(dc.scanMin, Math.min(S.revHeight*dc.scanPerH, dc.scanMax));                       // scan time scales with height
+  S.revTotal=S.tPull+S.tHold+S.tIn+S.tScan;
+  S.rev0Dist=camDist; S.rev0LookY=camLookY;   // camera pose at the instant of death (for a seamless start)
+  S.revealT=0; S.revealSpin=0; S.revealActive=true;
+  if(scene.fog){ scene.fog.near=S.overviewDist*1.5; scene.fog.far=S.overviewDist*3.4; }
+  clearTimeout(revealTimer); revealTimer=setTimeout(()=>show('gameover'), (S.revTotal+0.25)*1000);
+}
+function smooth(x){ x=x<0?0:x>1?1:x; return x*x*(3-2*x); }
+function lerp(a,b,k){ return a+(b-a)*k; }
+/* desired camera pose for the current point in the death cinematic */
+function revealPose(){
+  let t=S.revealT;
+  if(t<S.tPull){ const k=smooth(t/S.tPull);                       // play pose → overview
+    return { dist:lerp(S.rev0Dist,S.overviewDist,k), lookY:lerp(S.rev0LookY,S.revealMidY,k), spin:k*0.13 }; }
+  t-=S.tPull;
+  if(t<S.tHold) return { dist:S.overviewDist, lookY:S.revealMidY, spin:0.13+t*0.04 };   // hold the overview (slow drift)
+  t-=S.tHold;
+  if(t<S.tIn){ const k=smooth(t/S.tIn);                            // overview → top, move in close for the scan
+    return { dist:lerp(S.overviewDist,S.scanDist,k), lookY:lerp(S.revealMidY,S.revTopY,k), spin:0.13*(1-k) }; }
+  t-=S.tIn;
+  return { dist:S.scanDist, lookY:lerp(S.revTopY,S.revBotY,smooth(Math.min(1,t/S.tScan))), spin:0 };  // scan top → base
 }
 
 /* ---------- cull + dispose blocks only beyond KEEP_MAX (whole tower stays for the death reveal) ---------- */
@@ -572,9 +597,9 @@ function update(dt){
   // camera: follow the top while playing; on death, pull back to reveal the whole tower they built
   const d=CONFIG.CAM;
   if(S.mode==='gameover' && S.revealActive){
-    camDist += (S.revealDist - camDist)*Math.min(1,dt*1.9);          // ease the pull-back
-    camLookY += (S.revealMidY - camLookY)*Math.min(1,dt*1.9);        // recentre on the tower's middle
-    S.revealSpin = Math.min(S.revealSpin + dt*d.revealSpin, 0.5);    // gentle cinematic drift, capped
+    S.revealT += dt;
+    const p=revealPose();                                            // phased: pull back → hold → scan top→bottom
+    camDist=p.dist; camLookY=p.lookY; S.revealSpin=p.spin;           // smoothstep'd, so set directly
   } else {
     const topY=cy(S.tower.length-1);
     camTargetY += (topY+d.lookAhead - camTargetY)*Math.min(1,dt*d.follow);
