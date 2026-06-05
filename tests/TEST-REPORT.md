@@ -18,6 +18,7 @@
 | T06 | UI | Pause + audio toggles (Music/SFX/Haptics) | desktop | [06-pause-d.jpg](screenshots/06-pause-d.jpg) | ✅ PASS | HUD hidden behind overlay |
 | T07 | UI | Game over — hero height + best/perfects/streak + retry | desktop | [07-gameover-d.jpg](screenshots/07-gameover-d.jpg) | ✅ PASS | toppled block falls behind panel |
 | T08 | Persist | Best height + longest perfect streak remembered **after reload** | desktop | [08-record-reload-d.jpg](screenshots/08-record-reload-d.jpg) | ✅ PASS | shows Best 42 / Streak 6 post-reload |
+| T09 | Juice | Slice — overhang chunk tumbles away + particle shards spray at the cut | desktop | [09-shards-d.jpg](screenshots/09-shards-d.jpg) | ✅ PASS | debris + shard burst caught mid-flight |
 | T10 | Responsive | Menu on mobile | mobile | [10-menu-m.jpg](screenshots/10-menu-m.jpg) | ✅ PASS | fits, safe-area respected |
 | T11 | Responsive | Gameplay on mobile (low tower + moving block) | mobile | [11-play-m.jpg](screenshots/11-play-m.jpg) | ✅ PASS | full-bleed portrait |
 | T12 | Responsive | Tall tower on mobile | mobile | [12-tall-m.jpg](screenshots/12-tall-m.jpg) | ✅ PASS | |
@@ -41,7 +42,7 @@ The screenshot caught a live `PERFECT` popup + a falling slice debris mid-animat
 - **Screens / flow:** menu · onboarding · HUD · pause · game-over · reload-persist — all ✅
 - **Level structure (endless):** early (low/cool) · tall (height 42) · milestone (perfect-streak heat) — all ✅
 - **Difficulty:** 3 start-speed modes (Chill/Classic/Rush) selectable on the menu — ✅
-- **Core logic:** slide → tap-drop → slice overhang · PERFECT (no-trim + grow-back + pitch ladder + color/heat shift + combo popup) · alternating X/Z axis · miss = game over — all ✅ (real-tap playthrough T15)
+- **Core logic:** slide → tap-drop → slice overhang (+ sliced chunk debris & particle shards, T09) · PERFECT (no-trim + grow-back + pitch ladder + color/heat shift + combo popup + burst) · alternating X/Z axis · miss = game over — all ✅ (real-tap playthrough T15)
 - **Scoring/persistence:** height = score; best height + longest perfect streak saved to `localStorage` and restored after reload — ✅
 - **Responsive:** mobile 390×844 (menu + gameplay + game-over) and desktop 1280×800 — all ✅
 - **Robustness:** CDN/WebGL fail guard (`#fatal`) present; WebGL confirmed rendering in headless; 0 console errors.
@@ -52,4 +53,4 @@ The screenshot caught a live `PERFECT` popup + a falling slice debris mid-animat
 ## DOCS.md ↔ code
 - `DOCS.md` matches the shipped code: §6.1 modes (Chill 2.6 / Classic 3.4 / Rush 4.8), §7 scoring (height = score; perfect = grow-back + streak), §14 `CONFIG` constants all verified against `index.html`. ✅
 
-## ✅ VERDICT: **PASS — GAME DONE** (14/14 test cases PASS, 14 screenshots desktop+mobile, 0 console errors)
+## ✅ VERDICT: **PASS — GAME DONE** (15/15 test cases PASS, 15 screenshots desktop+mobile, 0 console errors)

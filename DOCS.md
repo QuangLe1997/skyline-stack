@@ -15,7 +15,7 @@
 | PERFECT drop — no trim + grow-back + combo | ✅ | `drop()` (`perfect` branch) |
 | Pitch ladder (rises per perfect, resets on miss) | ✅ | `Audio.perfect()` + `Audio.ladder` |
 | Perfect-streak heat — colour gradient → coral + screen shift | ✅ | `blockColor()`, `setHeat()`, `#heat` overlay |
-| Sliced debris (falls + fades, disposed) | ✅ | `spawnDebris()`, `update()` debris loop |
+| Sliced debris + slice particle shards (fall + fade, disposed) | ✅ | `spawnDebris()`, `spawnShards()`, `update()` debris loop |
 | Game over (miss / sliver too small) | ✅ | `topple()` |
 | Camera pans up smoothly as tower grows | ✅ | `update()` camera block (`camTargetY`) |
 | Near-fall wobble on a thin sliver | ✅ | `drop()` (`WOBBLE_AT`) + `update()` wobble |
@@ -76,7 +76,7 @@
   - `delta = movingCentre − belowCentre`, `overlap = belowSize − |delta|`.
   - `overlap < MIN_SLIVER` → **tower toppled** (game over).
   - `|delta| ≤ PERFECT` → **PERFECT** (see §7.2).
-  - otherwise → **trim:** new footprint on that axis `= overlap`, recentred on the overlap region; the overhang (`|delta|` wide) spawns as falling debris.
+  - otherwise → **trim:** new footprint on that axis `= overlap`, recentred on the overlap region; the overhang (`|delta|` wide) spawns as falling debris **plus a spray of particle shards at the cut plane**.
 - **Axis alternates** every level: odd levels slide on **X**, even on **Z** (`spawnMoving()`), so the tower is carved on both axes.
 - **Height = score** = number of blocks placed above the base.
 
@@ -146,7 +146,7 @@ Difficulty = how fast the block slides (and how fast that accelerates). Footprin
   - `S.streak++`, `S.perfects++`.
   - **Pitch ladder:** `Audio.perfect(streak)` plays the next note up `Audio.ladder` (C5→E6), capped at the top note.
   - **Heat** (`heat = min(streak/STREAK_MAX, 1)`): block hue blends toward coral, saturation rises; `#heat` screen overlay fades in; placed block gets a faint emissive glow.
-  - White flash + `PERFECT ×N` popup + double haptic + small camera shake.
+  - White flash + `PERFECT ×N` popup + double haptic + small camera shake + a celebratory **shard burst** (`spawnShards`, hot colour).
 - **Streak breaks** (set to 0) on any trimmed (non-perfect) drop.
 - **Longest streak** is saved (`skyline-stack.bestStreak`).
 
@@ -256,6 +256,6 @@ Also tunable: `Audio.ladder` (pitch-ladder notes), `#heat` opacity scale in `set
 ---
 
 ## 16. Update history
-- **2026-06-05** (initial): SKYLINE STACK v1 — 3D Stack core, perfect-streak heat (colour + pitch ladder + grow-back), 3 start-speed modes, debris, camera pan, bloom, synthwave, full shell + QA evidence.
+- **2026-06-05** (initial): SKYLINE STACK v1 — 3D Stack core, perfect-streak heat (colour + pitch ladder + grow-back), 3 start-speed modes, sliced debris + slice particle shards, camera pan, bloom, synthwave, full shell + QA evidence.
 
 > **Last updated:** 2026-06-05 · branch `main` · single-file `index.html`.

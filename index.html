@@ -457,6 +457,8 @@ function drop(forceDelta){
   } else {
     newSize=overlap; newCenter=bc+delta/2;
     spawnDebris(axis, below, mv, delta, ad, newCenter, newSize);
+    const _sgn=Math.sign(delta)||1, _cut=newCenter+_sgn*(newSize/2);   // particle spray at the cut plane
+    spawnShards((axis==='x')?_cut:mv.x, cy(lvl)+CONFIG.BLOCK_H*0.3, (axis==='z')?_cut:mv.z, mv.mesh.material.color, 7, 2.4, false);
     S.streak=0; Audio.drop(); Audio.slice(); haptic(12); S.shake=0.12;
     if(overlap < CONFIG.WOBBLE_AT){ S.wobble=0.5; S.wobbleSign=Math.sign(delta)||1; }
   }
@@ -467,6 +469,7 @@ function drop(forceDelta){
   mv.mesh.scale.set(nsx,CONFIG.BLOCK_H,nsz); mv.mesh.position.set(nx,cy(lvl),nz);
   const c=blockColor(lvl,S.streak);
   mv.mesh.material.color.copy(c.col); mv.mesh.material.emissive.copy(c.col); mv.mesh.material.emissiveIntensity=perfect?(0.06+c.heat*0.22):0.0;
+  if(perfect) spawnShards(nx, cy(lvl)+CONFIG.BLOCK_H*0.5, nz, c.col, 12, 3.0, true);   // celebratory burst on a perfect
   S.tower.push({ mesh:mv.mesh, x:nx, z:nz, sx:nsx, sz:nsz });
   S.move=null; S.height=lvl;
 
@@ -488,6 +491,20 @@ function spawnDebris(axis, below, mv, delta, ad, keptCenter, keptSize){
   const m=new THREE.Mesh(boxGeo,mat); m.scale.set(sx,CONFIG.BLOCK_H,sz); m.position.set(x,cy(mv.lvl),z); scene.add(m);
   S.debris.push({ mesh:m, vx:(axis==='x')?sign*3.2:0, vy:1.2, vz:(axis==='z')?sign*3.2:0,
     rx:(Math.random()-0.5)*5, rz:(Math.random()-0.5)*5, life:2.4 });
+}
+
+/* ---------- slice particle shards (reuse the debris physics loop) ---------- */
+function spawnShards(x,y,z,color,n,spd,hot){
+  for(let i=0;i<n;i++){
+    const mat=new THREE.MeshStandardMaterial({ color:color.clone(), roughness:0.4, metalness:0.0,
+      emissive:color.clone(), emissiveIntensity:hot?0.5:0.15, transparent:true, opacity:1 });
+    const s=0.07+Math.random()*0.11; const m=new THREE.Mesh(boxGeo,mat); m.scale.set(s,s,s);
+    m.position.set(x+(Math.random()-0.5)*0.3, y+(Math.random()-0.5)*0.3, z+(Math.random()-0.5)*0.3);
+    m.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6); scene.add(m);
+    const a=Math.random()*Math.PI*2, r=spd*(0.5+Math.random());
+    S.debris.push({ mesh:m, vx:Math.cos(a)*r, vy:(hot?2.4:1.4)+Math.random()*2.2, vz:Math.sin(a)*r,
+      rx:(Math.random()-0.5)*13, rz:(Math.random()-0.5)*13, life:0.62+Math.random()*0.34 });
+  }
 }
 
 /* ---------- game over ---------- */
@@ -629,6 +646,7 @@ window._build=function(n, opts={}){            // stack n blocks instantly (with
 window._streak=function(n){ S.streak=n; if(n>S.bestStreak) S.bestStreak=n; setHeat(); showStreak();
   if(n>=2) floatPop(`PERFECT ×${n}`,'perfect'); };
 window._over=function(){ if(S.move) drop(99); };   // force a miss → game over
+window._slice=function(){ if(S.move){ const below=S.tower[S.move.lvl-1], bc=(S.axis==='x')?below.x:below.z; S.move[S.axis]=bc+0.5; drop(); } };  // deliberate trim → spawn slice shards
 
 /* ?shot=scene[:arg] — drive a state for headless screenshots */
 (function(){ const shot=new URLSearchParams(location.search).get('shot'); if(!shot) return;
@@ -638,6 +656,7 @@ window._over=function(){ if(S.move) drop(99); };   // force a miss → game over
     case 'how':   show('how'); break;
     case 'play':  _build(n||4); break;                         // low tower, block mid-slide
     case 'tall':  _build(n||40); break;                        // tall tower, colour gradient
+    case 'shards': _build(n||9); _slice(); break;              // slice particle spray mid-flight
     case 'perfect': _build(n||26,{streak:6}); break;           // hot streak: heat overlay + popup + hot colours
     case 'pause': _build(n||10); pauseGame(); break;
     case 'over':  _build(n||14); _over(); setTimeout(()=>show('gameover'),60); break;
