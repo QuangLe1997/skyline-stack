@@ -107,6 +107,8 @@ canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; touc
 /* ---------- OVERLAYS ---------- */
 .overlay{ position:absolute; inset:0; display:grid; place-items:center; padding:22px; z-index:10;
   background:radial-gradient(120% 120% at 50% 0%, rgba(10,7,18,.5), rgba(6,5,12,.92)); }
+/* game-over keeps the revealed tower softly visible behind the panel */
+#gameover{ background:radial-gradient(130% 120% at 50% 30%, rgba(8,6,16,.28), rgba(6,5,12,.72)); }
 .overlay.hidden{ display:none; } .overlay.hidden, .overlay.hidden *{ pointer-events:none; }
 .panel{ width:100%; max-width:360px; text-align:center; border:1px solid var(--line);
   background:linear-gradient(180deg,rgba(24,20,40,.86),rgba(12,10,22,.93)); backdrop-filter:blur(14px);
@@ -255,8 +257,8 @@ const CONFIG = {
     rush:    { base:4.8, perLevel:0.090, max:12.5, label:'Rush'    },
   },
   COLOR: { hueStart:200, hueStep:4.2, perfectHue:14 }, // cyan→magenta base gradient walk → coral on hot streaks
-  CAM:   { dist:21, fov:30, dirX:1, dirY:0.86, dirZ:1, lookAhead:-1.9, follow:6.5 },
-  VISIBLE_DEPTH: 16,  // blocks kept below the top before culling+disposing
+  CAM:   { dist:21, fov:30, dirX:1, dirY:0.86, dirZ:1, lookAhead:-1.9, follow:6.5, revealMargin:1.42, revealSpin:0.14 },
+  KEEP_MAX: 240,      // keep the whole tower for the death reveal (off-screen blocks are frustum-culled); dispose only beyond this
   GRAVITY: 26,        // debris fall accel
 };
 
@@ -325,6 +327,7 @@ const S = {
   // engine / world filled in by boot()
   tower:[], debris:[], move:null, axis:'x', dir:1,
   shake:0, wobble:0, wobbleSign:1, engineReady:false,
+  revealActive:false, revealDist:21, revealMidY:0, revealSpin:0,   // death-cam: frame the whole tower
 };
 
 /* ---------- HUD ---------- */
@@ -369,7 +372,7 @@ async function boot(){
   const key = new THREE.DirectionalLight(0xfff0e6, 1.15); key.position.set(8,16,10); scene.add(key);
   const rim = new THREE.DirectionalLight(0xff8a5a, 0.5); rim.position.set(-9,6,-6); scene.add(rim);
 
-  camera = new THREE.PerspectiveCamera(CONFIG.CAM.fov, 1, 0.1, 200);
+  camera = new THREE.PerspectiveCamera(CONFIG.CAM.fov, 1, 1, 900);   // far plane roomy enough to frame a very tall tower on the death reveal
 
   // post: subtle bloom (weak strength + high threshold per house style)
   composer = new EffectComposer(renderer);
@@ -420,8 +423,11 @@ function buildBase(){
   const c=blockColor(0,0); const m=makeMesh(CONFIG.BASE_W,CONFIG.BASE_W,c,0.0);
   m.position.set(0,cy(0),0); scene.add(m);
   S.tower.push({ mesh:m, x:0, z:0, sx:CONFIG.BASE_W, sz:CONFIG.BASE_W });
-  camera.position.set(CONFIG.CAM.dirX,CONFIG.CAM.dirY,CONFIG.CAM.dirZ).normalize().multiplyScalar(CONFIG.CAM.dist);
-  camTargetY=cy(0); camera.lookAt(0,camTargetY,0);
+  camTargetY=cy(0); camDist=CONFIG.CAM.dist; camLookY=camTargetY;
+  S.revealActive=false; S.revealSpin=0;
+  if(scene.fog){ scene.fog.near=22; scene.fog.far=52; }   // restore play fog (the reveal pushes it out)
+  const _dir=new THREE.Vector3(CONFIG.CAM.dirX,CONFIG.CAM.dirY,CONFIG.CAM.dirZ).normalize();
+  camera.position.set(_dir.x*camDist, _dir.y*camDist+camLookY, _dir.z*camDist); camera.lookAt(0,camLookY,0);
 }
 
 /* ---------- spawn the next sliding block ---------- */
@@ -520,17 +526,30 @@ function topple(mv){
   Save.set('plays',(Save.get('plays',0)+1));
   $('#finalScore').firstChild.textContent=S.height;
   $('#goBest').textContent=S.best; $('#goPerfect').textContent=S.perfects; $('#goStreak').textContent=S.bestStreak;
-  setTimeout(()=>{ show('gameover'); }, 620);   // let the block fall a beat first
+  revealTower();                                 // pull the camera back to show the whole tower...
+  revealTimer=setTimeout(()=>{ show('gameover'); }, 1500);   // ...then bring up the panel (tap to skip)
 }
 
-/* ---------- cull + dispose blocks far below the view ---------- */
+/* pull the camera back to frame the entire tower the player built (the "behold your work" beat) */
+function revealTower(){
+  $('#heat').style.opacity=0;
+  const topLvl=S.tower.length-1; let botLvl=0; while(botLvl<topLvl && !S.tower[botLvl].mesh) botLvl++;
+  const topY=cy(topLvl)+CONFIG.BLOCK_H/2, botY=cy(botLvl)-CONFIG.BLOCK_H/2;
+  S.revealMidY=(topY+botY)/2;
+  const H=Math.max(topY-botY, CONFIG.BASE_W*1.6), fov=CONFIG.CAM.fov*Math.PI/180;
+  S.revealDist=Math.max(CONFIG.CAM.dist, (H*CONFIG.CAM.revealMargin*0.5)/Math.tan(fov*0.5)/0.82);  // fit the full height in view
+  if(scene.fog){ scene.fog.near=S.revealDist*1.5; scene.fog.far=S.revealDist*3.2; }                // don't fog out the pulled-back tower
+  S.revealSpin=0; S.revealActive=true;
+}
+
+/* ---------- cull + dispose blocks only beyond KEEP_MAX (whole tower stays for the death reveal) ---------- */
 function cullBelow(){
-  const cut=S.tower.length-1-CONFIG.VISIBLE_DEPTH;
+  const cut=S.tower.length-1-CONFIG.KEEP_MAX;
   for(let i=0;i<=cut;i++){ const b=S.tower[i]; if(b && b.mesh){ scene.remove(b.mesh); b.mesh.material.dispose(); b.mesh=null; } }
 }
 
 /* ---------- per-frame update ---------- */
-let camTargetY=0;
+let camTargetY=0, camDist=CONFIG.CAM.dist, camLookY=0, revealTimer=0;
 function update(dt){
   // slide the active block (constant-speed ping-pong)
   if(S.mode==='playing' && S.move){
@@ -550,12 +569,21 @@ function update(dt){
   if(S.wobble>0 && S.tower.length){ S.wobble=Math.max(0,S.wobble-dt*1.6);
     const top=S.tower[S.tower.length-1]; if(top.mesh) top.mesh.rotation[S.axis==='x'?'z':'x']=Math.sin(S.wobble*22)*S.wobble*0.06*S.wobbleSign; }
   else if(S.tower.length){ const top=S.tower[S.tower.length-1]; if(top.mesh){ top.mesh.rotation.x*=0.8; top.mesh.rotation.z*=0.8; } }
-  // camera follows the top (smooth)
-  const topY=cy(S.tower.length-1);
-  camTargetY += (topY+CONFIG.CAM.lookAhead - camTargetY)*Math.min(1,dt*CONFIG.CAM.follow);
-  const d=CONFIG.CAM, base=new THREE.Vector3(d.dirX,d.dirY,d.dirZ).normalize().multiplyScalar(d.dist);
+  // camera: follow the top while playing; on death, pull back to reveal the whole tower they built
+  const d=CONFIG.CAM;
+  if(S.mode==='gameover' && S.revealActive){
+    camDist += (S.revealDist - camDist)*Math.min(1,dt*1.9);          // ease the pull-back
+    camLookY += (S.revealMidY - camLookY)*Math.min(1,dt*1.9);        // recentre on the tower's middle
+    S.revealSpin = Math.min(S.revealSpin + dt*d.revealSpin, 0.5);    // gentle cinematic drift, capped
+  } else {
+    const topY=cy(S.tower.length-1);
+    camTargetY += (topY+d.lookAhead - camTargetY)*Math.min(1,dt*d.follow);
+    camDist=d.dist; camLookY=camTargetY;
+  }
   let sx=0,sy=0; if(S.shake>0){ S.shake=Math.max(0,S.shake-dt*2.2); sx=(Math.random()-0.5)*S.shake*0.5; sy=(Math.random()-0.5)*S.shake*0.5; }
-  camera.position.set(base.x+sx, base.y+camTargetY+sy, base.z); camera.lookAt(0,camTargetY,0);
+  const a=S.revealSpin, cx=d.dirX*Math.cos(a)-d.dirZ*Math.sin(a), cz=d.dirX*Math.sin(a)+d.dirZ*Math.cos(a);
+  const dir=new THREE.Vector3(cx,d.dirY,cz).normalize();
+  camera.position.set(dir.x*camDist+sx, dir.y*camDist+camLookY+sy, dir.z*camDist); camera.lookAt(0,camLookY,0);
 }
 
 function render(){ if(lowFX) renderer.render(scene,camera); else composer.render(); }
@@ -590,7 +618,8 @@ function toMenu(){ S.mode='menu'; Music.stop(); $('#bestVal').textContent=S.best
 /* ---------- input ---------- */
 addEventListener('pointerdown', ()=>{ gestured=true; }, true);
 addEventListener('keydown', ()=>{ gestured=true; }, true);
-function tap(){ if(S.mode==='playing'){ Audio.ensure(); drop(); } }
+function tap(){ if(S.mode==='playing'){ Audio.ensure(); drop(); }
+  else if(S.mode==='gameover' && $('#gameover').classList.contains('hidden')){ clearTimeout(revealTimer); show('gameover'); } }  // skip the reveal
 $('#cv').addEventListener('pointerdown', e=>{ e.preventDefault(); tap(); });
 addEventListener('keydown', e=>{
   if(e.code==='Space'){ e.preventDefault(); if(S.mode==='playing') tap(); else if(S.mode==='gameover') startGame(); }
@@ -659,7 +688,7 @@ window._slice=function(){ if(S.move){ const below=S.tower[S.move.lvl-1], bc=(S.a
     case 'shards': _build(n||9); _slice(); break;              // slice particle spray mid-flight
     case 'perfect': _build(n||26,{streak:6}); break;           // hot streak: heat overlay + popup + hot colours
     case 'pause': _build(n||10); pauseGame(); break;
-    case 'over':  _build(n||14); _over(); setTimeout(()=>show('gameover'),60); break;
+    case 'over':  _build(n||14); _over(); break;               // topple() runs the reveal, then shows the panel at 1500ms
   } };
   // wait for engine
   const wait=()=>{ if(S.engineReady) setTimeout(go,260); else setTimeout(wait,80); }; wait();

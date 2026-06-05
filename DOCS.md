@@ -18,8 +18,9 @@
 | Sliced debris + slice particle shards (fall + fade, disposed) | ✅ | `spawnDebris()`, `spawnShards()`, `update()` debris loop |
 | Game over (miss / sliver too small) | ✅ | `topple()` |
 | Camera pans up smoothly as tower grows | ✅ | `update()` camera block (`camTargetY`) |
+| Death-cam: pull back to reveal the whole tower on game over (+ tap-to-skip, slow drift) | ✅ | `revealTower()`, `update()` reveal branch |
 | Near-fall wobble on a thin sliver | ✅ | `drop()` (`WOBBLE_AT`) + `update()` wobble |
-| Geometry/material disposal below view (no leaks) | ✅ | `cullBelow()` |
+| Whole tower kept for the reveal; dispose only beyond `KEEP_MAX` (off-screen frustum-culled) | ✅ | `cullBelow()` |
 | Start-speed modes (Chill / Classic / Rush) | ✅ | `CONFIG.MODES`, `#modePills` |
 | Subtle bloom + premium lighting + env | ✅ | `boot()` (composer, lights, PMREM) |
 | CDN / WebGL fail guard | ✅ | `boot().catch` → `#fatal` overlay |
@@ -64,7 +65,7 @@
 - **menu:** pick a start-speed mode, view best height + longest streak.
 - **playing:** the active block slides; tap drops it. rAF render loop runs always; logic only advances while `playing`.
 - **paused:** slide frozen, scene still renders; music stops.
-- **gameover:** the missed block tumbles, then the end panel shows (height + best + perfects + longest streak).
+- **gameover:** the missed block tumbles; the camera **pulls back to reveal the whole tower** the player built (`revealTower()`, ~1.5 s with a slow drift), then the end panel rises with the tower still softly visible behind it (tap to skip the reveal). Stats: height + best + perfects + longest streak.
 - Plus **fatal** overlay if the 3D engine fails to load (CDN/WebGL guard).
 
 > **Loop model:** this is a continuous real-time action game, so the loop is **rAF + delta-time** with `dt` clamped to ≤ 0.05 s (`loop()`), not a fixed-tick grid stepper. The slide is constant-speed; the camera lerps for smoothness. (Fixed-tick is reserved for deterministic grid games like snake/tetris.)
@@ -218,8 +219,9 @@ const CONFIG = {
     rush:    { base:4.8, perLevel:0.090, max:12.5, label:'Rush'    },
   },
   COLOR: { hueStart:200, hueStep:4.2, perfectHue:14 },         // cyan→ walk, coral on heat
-  CAM:   { dist:21, fov:30, dirX:1, dirY:0.86, dirZ:1, lookAhead:-1.9, follow:6.5 },
-  VISIBLE_DEPTH: 16,  // blocks kept below the top before culling+disposing
+  CAM:   { dist:21, fov:30, dirX:1, dirY:0.86, dirZ:1, lookAhead:-1.9, follow:6.5,
+           revealMargin:1.42, revealSpin:0.14 },   // death-cam: pull-back framing margin + drift rate
+  KEEP_MAX: 240,      // whole tower kept for the death reveal; dispose only beyond this
   GRAVITY: 26,        // debris fall accel
 };
 ```
@@ -257,5 +259,6 @@ Also tunable: `Audio.ladder` (pitch-ladder notes), `#heat` opacity scale in `set
 
 ## 16. Update history
 - **2026-06-05** (initial): SKYLINE STACK v1 — 3D Stack core, perfect-streak heat (colour + pitch ladder + grow-back), 3 start-speed modes, sliced debris + slice particle shards, camera pan, bloom, synthwave, full shell + QA evidence.
+- **2026-06-05**: **death-cam reveal** — on game over the camera pulls back to frame the whole tower (slow drift, tap-to-skip); keep the entire tower (`KEEP_MAX`) instead of culling below the view; fog/far-plane widened for the pulled-back shot.
 
 > **Last updated:** 2026-06-05 · branch `main` · single-file `index.html`.

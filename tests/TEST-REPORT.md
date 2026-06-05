@@ -16,7 +16,7 @@
 | T04 | Level | Tall tower (height 42) — gradient + visible trims/taper | desktop | [04-tall-d.jpg](screenshots/04-tall-d.jpg) | ✅ PASS | endless ramp, camera panned up |
 | T05 | Logic | PERFECT streak — heat color shift to coral + `PERFECT ×N` popup + streak chip + screen heat | desktop | [05-perfect-d.jpg](screenshots/05-perfect-d.jpg) | ✅ PASS | the core hook |
 | T06 | UI | Pause + audio toggles (Music/SFX/Haptics) | desktop | [06-pause-d.jpg](screenshots/06-pause-d.jpg) | ✅ PASS | HUD hidden behind overlay |
-| T07 | UI | Game over — hero height + best/perfects/streak + retry | desktop | [07-gameover-d.jpg](screenshots/07-gameover-d.jpg) | ✅ PASS | toppled block falls behind panel |
+| T07 | UI | Game over — hero height + best/perfects/streak + retry (panel over the revealed tower) | desktop | [07-gameover-d.jpg](screenshots/07-gameover-d.jpg) | ✅ PASS | tower softly visible behind panel |
 | T08 | Persist | Best height + longest perfect streak remembered **after reload** | desktop | [08-record-reload-d.jpg](screenshots/08-record-reload-d.jpg) | ✅ PASS | shows Best 42 / Streak 6 post-reload |
 | T09 | Juice | Slice — overhang chunk tumbles away + particle shards spray at the cut | desktop | [09-shards-d.jpg](screenshots/09-shards-d.jpg) | ✅ PASS | debris + shard burst caught mid-flight |
 | T10 | Responsive | Menu on mobile | mobile | [10-menu-m.jpg](screenshots/10-menu-m.jpg) | ✅ PASS | fits, safe-area respected |
@@ -25,6 +25,7 @@
 | T13 | Logic | PERFECT streak heat on mobile (streak chip + hot hues) | mobile | [13-perfect-m.jpg](screenshots/13-perfect-m.jpg) | ✅ PASS | |
 | T14 | Responsive | Game over on mobile | mobile | [14-gameover-m.jpg](screenshots/14-gameover-m.jpg) | ✅ PASS | panel fits, no overflow |
 | T15 | Logic | **Real end-to-end playthrough via UI** (no dev shortcuts) | mobile | [15-realplay-m.jpg](screenshots/15-realplay-m.jpg) | ✅ PASS | see below |
+| T16 | Juice | **Death-cam** — on game over the camera pulls back to reveal the whole tower the player built | desktop | [16-reveal-d.jpg](screenshots/16-reveal-d.jpg) | ✅ PASS | full base→top framing (height 40), mid pull-back, tap-to-skip |
 
 ### T15 — real interaction trace (clicks on the actual UI, taps on the canvas)
 ```
@@ -53,4 +54,4 @@ The screenshot caught a live `PERFECT` popup + a falling slice debris mid-animat
 ## DOCS.md ↔ code
 - `DOCS.md` matches the shipped code: §6.1 modes (Chill 2.6 / Classic 3.4 / Rush 4.8), §7 scoring (height = score; perfect = grow-back + streak), §14 `CONFIG` constants all verified against `index.html`. ✅
 
-## ✅ VERDICT: **PASS — GAME DONE** (15/15 test cases PASS, 15 screenshots desktop+mobile, 0 console errors)
+## ✅ VERDICT: **PASS — GAME DONE** (16/16 test cases PASS, 16 screenshots desktop+mobile, 0 console errors)
